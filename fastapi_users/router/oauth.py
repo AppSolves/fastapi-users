@@ -1,5 +1,3 @@
-from typing import Optional
-
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallback
@@ -32,7 +30,7 @@ def get_oauth_router(
     backend: AuthenticationBackend[models.UP, models.ID],
     get_user_manager: UserManagerDependency[models.UP, models.ID],
     state_secret: SecretType,
-    redirect_url: Optional[str] = None,
+    redirect_url: str | None = None,
     associate_by_email: bool = False,
     is_verified_by_default: bool = False,
 ) -> APIRouter:
@@ -92,6 +90,18 @@ def get_oauth_router(
                                 "summary": "User is inactive.",
                                 "value": {"detail": ErrorCode.LOGIN_BAD_CREDENTIALS},
                             },
+                            ErrorCode.ACCESS_TOKEN_DECODE_ERROR: {
+                                "summary": "Access token is error.",
+                                "value": {
+                                    "detail": ErrorCode.ACCESS_TOKEN_DECODE_ERROR
+                                },
+                            },
+                            ErrorCode.ACCESS_TOKEN_ALREADY_EXPIRED: {
+                                "summary": "Access token is already expired.",
+                                "value": {
+                                    "detail": ErrorCode.ACCESS_TOKEN_ALREADY_EXPIRED
+                                },
+                            },
                         }
                     }
                 },
@@ -120,7 +130,15 @@ def get_oauth_router(
         try:
             decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except jwt.DecodeError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.ACCESS_TOKEN_DECODE_ERROR,
+            )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.ACCESS_TOKEN_ALREADY_EXPIRED,
+            )
 
         try:
             user = await user_manager.oauth_callback(
@@ -160,7 +178,7 @@ def get_oauth_associate_router(
     get_user_manager: UserManagerDependency[models.UP, models.ID],
     user_schema: type[schemas.U],
     state_secret: SecretType,
-    redirect_url: Optional[str] = None,
+    redirect_url: str | None = None,
     requires_verification: bool = False,
 ) -> APIRouter:
     """Generate a router with the OAuth routes to associate an authenticated user."""
@@ -223,6 +241,18 @@ def get_oauth_associate_router(
                                 "summary": "Invalid state token.",
                                 "value": None,
                             },
+                            ErrorCode.ACCESS_TOKEN_DECODE_ERROR: {
+                                "summary": "Access token is error.",
+                                "value": {
+                                    "detail": ErrorCode.ACCESS_TOKEN_DECODE_ERROR
+                                },
+                            },
+                            ErrorCode.ACCESS_TOKEN_ALREADY_EXPIRED: {
+                                "summary": "Access token is already expired.",
+                                "value": {
+                                    "detail": ErrorCode.ACCESS_TOKEN_ALREADY_EXPIRED
+                                },
+                            },
                         }
                     }
                 },
@@ -251,7 +281,15 @@ def get_oauth_associate_router(
         try:
             state_data = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
         except jwt.DecodeError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.ACCESS_TOKEN_DECODE_ERROR,
+            )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ErrorCode.ACCESS_TOKEN_ALREADY_EXPIRED,
+            )
 
         if state_data["sub"] != str(user.id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
@@ -267,6 +305,6 @@ def get_oauth_associate_router(
             request,
         )
 
-        return schemas.model_validate(user_schema, user)
+        return user_schema.model_validate(user)
 
     return router

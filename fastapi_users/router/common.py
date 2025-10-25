@@ -1,11 +1,10 @@
 from enum import Enum
-from typing import Union
 
 from pydantic import BaseModel
 
 
 class ErrorModel(BaseModel):
-    detail: Union[str, dict[str, str]]
+    detail: str | dict[str, str]
 
 
 class ErrorCodeReasonModel(BaseModel):
@@ -26,3 +25,5 @@ class ErrorCode(str, Enum):
     VERIFY_USER_ALREADY_VERIFIED = "VERIFY_USER_ALREADY_VERIFIED"
     UPDATE_USER_EMAIL_ALREADY_EXISTS = "UPDATE_USER_EMAIL_ALREADY_EXISTS"
     UPDATE_USER_INVALID_PASSWORD = "UPDATE_USER_INVALID_PASSWORD"
+    ACCESS_TOKEN_ALREADY_EXPIRED = "ACCESS_TOKEN_ALREADY_EXPIRED"
+    ACCESS_TOKEN_DECODE_ERROR = "ACCESS_TOKEN_DECODE_ERROR"
